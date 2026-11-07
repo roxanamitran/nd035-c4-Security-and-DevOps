@@ -5,9 +5,18 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.slf4j.LoggerFactory;
+
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -36,6 +45,26 @@ class UserControllerTest {
 	@InjectMocks
 	private UserController userController;
 
+	private ListAppender<ILoggingEvent> appender;
+	private Logger logger;
+
+	@BeforeEach
+	void attachAppender() {
+		logger = (Logger) LoggerFactory.getLogger(UserController.class);
+		appender = new ListAppender<>();
+		appender.start();
+		logger.addAppender(appender);
+	}
+
+	@AfterEach
+	void detachAppender() {
+		logger.detachAppender(appender);
+	}
+
+	private List<String> logged() {
+		return appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+	}
+
 	private CreateUserRequest request(String password, String confirm) {
 		CreateUserRequest request = new CreateUserRequest();
 		request.setUsername("roxana");
@@ -58,6 +87,7 @@ class UserControllerTest {
 		assertNotNull(user.getCart());
 		verify(cartRepository).save(user.getCart());
 		verify(userRepository).save(user);
+		assertEquals(List.of("event=CREATE_USER_SUCCESS username=roxana"), logged());
 	}
 
 	@Test
@@ -65,6 +95,7 @@ class UserControllerTest {
 		ResponseEntity<User> response = userController.createUser(request("short", "short"));
 
 		assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+		assertEquals(List.of("event=CREATE_USER_FAILURE username=roxana reason=PASSWORD_TOO_SHORT"), logged());
 	}
 
 	@Test
@@ -72,6 +103,7 @@ class UserControllerTest {
 		ResponseEntity<User> response = userController.createUser(request(null, null));
 
 		assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+		assertEquals(List.of("event=CREATE_USER_FAILURE username=roxana reason=PASSWORD_TOO_SHORT"), logged());
 	}
 
 	@Test
@@ -79,6 +111,7 @@ class UserControllerTest {
 		ResponseEntity<User> response = userController.createUser(request("password123", "different123"));
 
 		assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+		assertEquals(List.of("event=CREATE_USER_FAILURE username=roxana reason=PASSWORD_MISMATCH"), logged());
 	}
 
 	@Test

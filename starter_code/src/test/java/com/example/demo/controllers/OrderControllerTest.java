@@ -2,6 +2,7 @@ package com.example.demo.controllers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -9,14 +10,20 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 
 import com.example.demo.model.persistence.Cart;
 import com.example.demo.model.persistence.Item;
@@ -38,6 +45,26 @@ class OrderControllerTest {
 	private OrderController orderController;
 
 	private User user;
+
+	private ListAppender<ILoggingEvent> appender;
+	private Logger logger;
+
+	@BeforeEach
+	void attachAppender() {
+		logger = (Logger) LoggerFactory.getLogger(OrderController.class);
+		appender = new ListAppender<>();
+		appender.start();
+		logger.addAppender(appender);
+	}
+
+	@AfterEach
+	void detachAppender() {
+		logger.detachAppender(appender);
+	}
+
+	private List<String> logged() {
+		return appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+	}
 
 	@BeforeEach
 	void setUp() {
@@ -66,6 +93,9 @@ class OrderControllerTest {
 		assertEquals(new BigDecimal("4.00"), order.getTotal());
 		assertSame(user, order.getUser());
 		verify(orderRepository).save(order);
+		assertEquals(1, logged().size());
+		assertTrue(logged().get(0).startsWith("event=ORDER_SUCCESS username=roxana orderId="));
+		assertTrue(logged().get(0).endsWith("total=4.00"));
 	}
 
 	@Test
@@ -75,6 +105,7 @@ class OrderControllerTest {
 		ResponseEntity<UserOrder> response = orderController.submit("ghost");
 
 		assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+		assertEquals(List.of("event=ORDER_FAILURE username=ghost reason=USER_NOT_FOUND"), logged());
 		verifyNoInteractions(orderRepository);
 	}
 
