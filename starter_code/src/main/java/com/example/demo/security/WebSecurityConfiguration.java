@@ -47,7 +47,6 @@ public class WebSecurityConfiguration {
 				.exceptionHandling(errors -> errors
 						.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
 				.authorizeHttpRequests(requests -> requests
-						// Lets errors raised by permitted requests render instead of turning into a 401.
 						.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
 						.requestMatchers(HttpMethod.POST, SecurityConstants.SIGN_UP_URL).permitAll()
 						.anyRequest().authenticated())
